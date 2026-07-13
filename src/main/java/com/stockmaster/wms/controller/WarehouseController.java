@@ -28,6 +28,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class WarehouseController {
 
+
     private final IWarehouseService warehouseService;
 
     // ==================== 查询 ====================
