@@ -29,6 +29,22 @@ public class InboundOrderController {
     private final ISupplyService supplyService;
     private final IOrderTypeService orderTypeService;
     private final IGoodsService goodsService;
+    private final IUnitService unitService;
+
+    // ==================== 表单选项（前端下拉数据） ====================
+
+    @GetMapping("/form-options")
+    @Operation(summary = "获取入单表单所有下拉数据（仓库/供应商/订单类型/物料/单位）")
+    public Result<Map<String, Object>> formOptions() {
+        return Result.ok(Map.of(
+            "warehouses", warehouseService.list(),
+            "supplies", supplyService.list(),
+            "orderTypes", orderTypeService.list(
+                new LambdaQueryWrapper<OrderType>().eq(OrderType::getDirection, "IN")),
+            "goods", goodsService.list(),
+            "units", unitService.list()
+        ));
+    }
 
     // ==================== 查询 ====================
 
@@ -38,10 +54,16 @@ public class InboundOrderController {
             @Parameter(description = "页码") @RequestParam(defaultValue = "1") Integer current,
             @Parameter(description = "每页条数") @RequestParam(defaultValue = "10") Integer size,
             @Parameter(description = "订单号") @RequestParam(required = false) String orderNo,
-            @Parameter(description = "状态") @RequestParam(required = false) String status) {
+            @Parameter(description = "状态") @RequestParam(required = false) String status,
+            @Parameter(description = "仓库ID") @RequestParam(required = false) Long warehouseId,
+            @Parameter(description = "开始日期(yyyy-MM-dd)") @RequestParam(required = false) String startDate,
+            @Parameter(description = "结束日期(yyyy-MM-dd)") @RequestParam(required = false) String endDate) {
         LambdaQueryWrapper<OrderHeader> w = new LambdaQueryWrapper<>();
         w.like(StringUtils.hasText(orderNo), OrderHeader::getOrderNo, orderNo);
         w.eq(StringUtils.hasText(status), OrderHeader::getStatus, status);
+        w.eq(warehouseId != null, OrderHeader::getWarehouseId, warehouseId);
+        w.ge(StringUtils.hasText(startDate), OrderHeader::getOrderDate, startDate);
+        w.le(StringUtils.hasText(endDate), OrderHeader::getOrderDate, endDate);
         w.orderByDesc(OrderHeader::getCreateTime);
         IPage<OrderHeader> page = headerService.page(new Page<>(current, size), w);
 
