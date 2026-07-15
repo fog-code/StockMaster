@@ -13,60 +13,53 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-public class AuditInServiceImpl extends ServiceImpl<AuditInMapper, AuditIn>
-        implements IAuditInService {
+public class AuditInServiceImpl extends ServiceImpl<AuditInMapper, AuditIn> implements IAuditInService {
 
-    private final IOrderHeaderService orderHeaderService;
-    private final IOrderLineService orderLineService;
+    private final IOrderHeaderService headerService;
+    private final IOrderLineService lineService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public int generateFromOrder(Long headerId) {
-        // 1. 校验入库单存在且状态为"待验收"
-        OrderHeader header = orderHeaderService.getById(headerId);
-        if (header == null) {
-            throw new RuntimeException("入库单不存在");
-        }
+    public void generateFromOrder(Long headerId) {
+        // 1. 校验订单
+        OrderHeader header = headerService.getById(headerId);
+        if (header == null) throw new RuntimeException("订单不存在");
         if (!"待验收".equals(header.getStatus())) {
-            throw new RuntimeException("只有【待验收】状态的入库单可以生成质检记录");
+            throw new RuntimeException("只有【待验收】状态的订单可以提交质检，当前状态：" + header.getStatus());
         }
 
-        // 2. 查出所有订单行
-        List<OrderLine> lines = orderLineService.list(
+        // 2. 查订单行
+        List<OrderLine> lines = lineService.list(
                 new LambdaQueryWrapper<OrderLine>().eq(OrderLine::getHeaderId, headerId));
-        if (lines.isEmpty()) {
-            throw new RuntimeException("入库单没有明细行，无法生成质检记录");
+
+        if (lines.isEmpty()) throw new RuntimeException("订单没有明细");
+
+        // 3. 为每行生成质检记录
+        List<AuditIn> audits = new ArrayList<>();
+        for (OrderLine line : lines) {
+            AuditIn a = new AuditIn();
+            a.setHeaderId(headerId);
+            a.setLineId(line.getId());
+            a.setGoodsId(line.getGoodsId());
+            a.setPlanQty(line.getPlanQty());     // 应检数 = 订单计划数
+            a.setStatus("待验收");
+            audits.add(a);
         }
+        this.saveBatch(audits);
 
-        // 3. 检查是否已经生成过质检记录（防止重复生成）
-        long existCount = this.count(
-                new LambdaQueryWrapper<AuditIn>().eq(AuditIn::getHeaderId, headerId));
-        if (existCount > 0) {
-            throw new RuntimeException("该入库单已生成过质检记录，请勿重复操作");
-        }
-
-        // 4. 为每条订单行创建质检记录
-        List<AuditIn> auditList = lines.stream().map(line -> {
-            AuditIn audit = new AuditIn();
-            audit.setHeaderId(headerId);
-            audit.setLineId(line.getId());
-            audit.setGoodsId(line.getGoodsId());
-            audit.setUnitId(line.getUnitId());
-            audit.setPlanQty(line.getPlanQty());
-            audit.setStatus("待质检");
-            return audit;
-        }).toList();
-
-        this.saveBatch(auditList);
-
-        // 5. 更新入库单状态为"验收中"
+        // 4. 更新订单头状态：待验收 → 验收中
         header.setStatus("验收中");
-        orderHeaderService.updateById(header);
+        headerService.updateById(header);
 
-        return auditList.size();
+        // 5. 更新所有行状态
+        for (OrderLine line : lines) {
+            line.setStatus("验收中");
+        }
+        lineService.updateBatchById(lines);
     }
 }

@@ -10,111 +10,82 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-@Tag(name = "入库质检管理", description = "从入库单生成质检记录、查询质检列表")
+@Tag(name = "入库质检", description = "入库质检记录管理")
 @RestController
 @RequestMapping("/inbound/audit")
 @RequiredArgsConstructor
 public class AuditInController {
 
     private final IAuditInService auditInService;
-    private final IOrderHeaderService orderHeaderService;
+    private final IOrderHeaderService headerService;
     private final IGoodsService goodsService;
-    private final IUnitService unitService;
 
-    // ==================== 生成质检记录 ====================
-
+    /**
+     * 核心：从入库单生成质检记录
+     */
     @PostMapping("/generate/{headerId}")
-    @Operation(summary = "从入库单生成质检记录", description = "入库单状态必须为【待验收】，生成后状态变为【验收中】")
-    public Result<Integer> generate(@PathVariable Long headerId) {
+    @Operation(summary = "从入库单生成质检记录（状态：待验收→验收中）")
+    public Result<String> generate(@Parameter(description = "入库单头ID") @PathVariable Long headerId) {
         try {
-            int count = auditInService.generateFromOrder(headerId);
-            return Result.ok("成功生成 " + count + " 条质检记录", count);
+            auditInService.generateFromOrder(headerId);
+            return Result.ok("质检记录已生成，订单状态已变更为【验收中】", null);
         } catch (RuntimeException e) {
             return Result.error(e.getMessage());
         }
     }
 
-    // ==================== 查询 ====================
-
+    /**
+     * 分页查询质检记录
+     */
     @GetMapping("/page")
-    @Operation(summary = "分页查询质检记录（含物料/单位/订单号）")
+    @Operation(summary = "分页查询质检记录")
     public Result<IPage<AuditIn>> page(
             @Parameter(description = "页码") @RequestParam(defaultValue = "1") Integer current,
             @Parameter(description = "每页条数") @RequestParam(defaultValue = "10") Integer size,
-            @Parameter(description = "入库单头ID") @RequestParam(required = false) Long headerId,
-            @Parameter(description = "物料ID") @RequestParam(required = false) Long goodsId,
-            @Parameter(description = "状态：待质检/合格/不合格") @RequestParam(required = false) String status) {
-
+            @Parameter(description = "入库单ID") @RequestParam(required = false) Long headerId,
+            @Parameter(description = "状态") @RequestParam(required = false) String status) {
         LambdaQueryWrapper<AuditIn> w = new LambdaQueryWrapper<>();
         w.eq(headerId != null, AuditIn::getHeaderId, headerId);
-        w.eq(goodsId != null, AuditIn::getGoodsId, goodsId);
-        w.eq(status != null && !status.isEmpty(), AuditIn::getStatus, status);
+        w.eq(StringUtils.hasText(status), AuditIn::getStatus, status);
         w.orderByDesc(AuditIn::getCreateTime);
 
-        IPage<AuditIn> result = auditInService.page(new Page<>(current, size), w);
-        if (!result.getRecords().isEmpty()) {
-            fillNames(result.getRecords());
-        }
-        return Result.ok(result);
-    }
-
-    @GetMapping("/by-order/{headerId}")
-    @Operation(summary = "按入库单ID查询所有质检记录")
-    public Result<List<AuditIn>> byOrder(@PathVariable Long headerId) {
-        List<AuditIn> list = auditInService.list(
-                new LambdaQueryWrapper<AuditIn>()
-                        .eq(AuditIn::getHeaderId, headerId)
-                        .orderByAsc(AuditIn::getId));
-        if (!list.isEmpty()) {
-            fillNames(list);
-        }
-        return Result.ok(list);
+        IPage<AuditIn> page = auditInService.page(new Page<>(current, size), w);
+        fillNames(page.getRecords());
+        return Result.ok(page);
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "查询质检记录详情")
+    @Operation(summary = "质检记录详情")
     public Result<AuditIn> detail(@PathVariable Long id) {
-        AuditIn audit = auditInService.getById(id);
-        if (audit == null) return Result.error("质检记录不存在");
-        fillNames(List.of(audit));
-        return Result.ok(audit);
+        AuditIn a = auditInService.getById(id);
+        if (a == null) return Result.error("记录不存在");
+        fillNames(List.of(a));
+        return Result.ok(a);
     }
 
-    // ==================== 辅助 ====================
+    /**
+     * 填充关联名称（物料名、订单号）
+     */
+    private void fillNames(List<AuditIn> audits) {
+        if (audits.isEmpty()) return;
+        List<Long> goodsIds = audits.stream().map(AuditIn::getGoodsId).distinct().collect(Collectors.toList());
+        List<Long> headerIds = audits.stream().map(AuditIn::getHeaderId).distinct().collect(Collectors.toList());
 
-    private void fillNames(List<AuditIn> list) {
-        // 物料
-        List<Long> goodsIds = list.stream().map(AuditIn::getGoodsId)
-                .filter(g -> g != null).distinct().collect(Collectors.toList());
-        Map<Long, Goods> goodsMap = goodsService.listByIds(goodsIds).stream()
-                .collect(Collectors.toMap(Goods::getId, g -> g));
-
-        // 单位
-        List<Long> unitIds = list.stream().map(AuditIn::getUnitId)
-                .filter(u -> u != null).distinct().collect(Collectors.toList());
-        Map<Long, String> unitMap = unitService.listByIds(unitIds).stream()
-                .collect(Collectors.toMap(Unit::getId, Unit::getUnitName));
-
-        // 入库单号
-        List<Long> headerIds = list.stream().map(AuditIn::getHeaderId)
-                .filter(h -> h != null).distinct().collect(Collectors.toList());
-        Map<Long, String> orderNoMap = orderHeaderService.listByIds(headerIds).stream()
+        Map<Long, String> goodsMap = goodsService.listByIds(goodsIds).stream()
+                .collect(Collectors.toMap(Goods::getId, Goods::getGoodsName));
+        Map<Long, String> orderMap = headerService.listByIds(headerIds).stream()
                 .collect(Collectors.toMap(OrderHeader::getId, OrderHeader::getOrderNo));
 
-        list.forEach(a -> {
-            Goods g = goodsMap.get(a.getGoodsId());
-            if (g != null) {
-                a.setGoodsName(g.getGoodsName());
-                a.setGoodsCode(g.getGoodsCode());
-            }
-            a.setUnitName(unitMap.get(a.getUnitId()));
-            a.setOrderNo(orderNoMap.get(a.getHeaderId()));
+        audits.forEach(a -> {
+            a.setGoodsName(goodsMap.get(a.getGoodsId()));
+            a.setOrderNo(orderMap.get(a.getHeaderId()));
         });
     }
 }

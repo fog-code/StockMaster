@@ -5,5 +5,4 @@ import com.stockmaster.wms.entity.AuditIn;
 import org.apache.ibatis.annotations.Mapper;
 
 @Mapper
-public interface AuditInMapper extends BaseMapper<AuditIn> {
-}
+public interface AuditInMapper extends BaseMapper<AuditIn> {}
