@@ -71,6 +71,24 @@ public class AuditInController {
     }
 
     /**
+     * 执行质检操作（合格/不合格）
+     */
+    @PostMapping("/{id}/operate")
+    @Operation(summary = "执行质检（合格数量 + 不合格数量）")
+    public Result<String> operate(
+            @Parameter(description = "质检记录ID") @PathVariable Long id,
+            @Parameter(description = "合格数量") @RequestParam java.math.BigDecimal qualifiedQty,
+            @Parameter(description = "不合格数量") @RequestParam java.math.BigDecimal unqualifiedQty,
+            @Parameter(description = "备注") @RequestParam(required = false) String remark) {
+        try {
+            auditInService.operate(id, qualifiedQty, unqualifiedQty, remark);
+            return Result.ok("质检完成", null);
+        } catch (RuntimeException e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
      * 填充关联名称（物料名、订单号）
      */
     private void fillNames(List<AuditIn> audits) {
