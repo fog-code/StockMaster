@@ -10,6 +10,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -81,5 +83,24 @@ public class StockServiceImpl extends ServiceImpl<StockMapper, Stock> implements
                     .eq(OrderLine::getHeaderId, audit.getHeaderId()))
                     .forEach(l -> { l.setStatus("已完成"); lineService.updateById(l); });
         }
+    }
+
+    @Override
+    public List<Stock> recommendStock(Long goodsId, BigDecimal qty) {
+        // FIFO：按创建时间升序（最早入库的先用）
+        List<Stock> stocks = this.list(new LambdaQueryWrapper<Stock>()
+                .eq(Stock::getGoodsId, goodsId)
+                .gt(Stock::getQty, 0)
+                .orderByAsc(Stock::getCreateTime));
+
+        // 智能推荐：累计库存直到满足需求
+        List<Stock> result = new ArrayList<>();
+        BigDecimal accumulated = BigDecimal.ZERO;
+        for (Stock s : stocks) {
+            result.add(s);
+            accumulated = accumulated.add(s.getQty());
+            if (accumulated.compareTo(qty) >= 0) break;
+        }
+        return result;
     }
 }
