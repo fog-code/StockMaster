@@ -3,6 +3,7 @@ package com.stockmaster.wms.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.stockmaster.wms.entity.*;
+import com.stockmaster.wms.dto.StockRecommendVO;
 import com.stockmaster.wms.mapper.StockMapper;
 import com.stockmaster.wms.service.*;
 import lombok.RequiredArgsConstructor;
@@ -100,6 +101,27 @@ public class StockServiceImpl extends ServiceImpl<StockMapper, Stock> implements
             result.add(s);
             accumulated = accumulated.add(s.getQty());
             if (accumulated.compareTo(qty) >= 0) break;
+        }
+        return result;
+    }
+
+    @Override
+    public List<StockRecommendVO> recommendStockDetail(Long goodsId, BigDecimal qty) {
+        List<Stock> stocks = this.list(new LambdaQueryWrapper<Stock>()
+                .eq(Stock::getGoodsId, goodsId)
+                .gt(Stock::getQty, 0)
+                .orderByAsc(Stock::getCreateTime));
+
+        List<StockRecommendVO> result = new ArrayList<>();
+        BigDecimal remaining = qty;
+        for (Stock s : stocks) {
+            if (remaining.compareTo(BigDecimal.ZERO) <= 0) break;
+            BigDecimal pick = s.getQty().min(remaining);  // 取 min(库存, 剩余需求)
+            result.add(new StockRecommendVO(
+                    s.getId(), s.getGoodsId(), null,
+                    s.getKwId(), null, s.getWarehouseId(), null,
+                    s.getQty(), pick));
+            remaining = remaining.subtract(pick);
         }
         return result;
     }

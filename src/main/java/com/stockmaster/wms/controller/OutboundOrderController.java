@@ -32,6 +32,7 @@ public class OutboundOrderController {
     private final IGoodsService goodsService;
     private final IUnitService unitService;
     private final IStockService stockService;
+    private final IKwService kwService;
 
     // ==================== 表单选项 ====================
 
@@ -51,26 +52,29 @@ public class OutboundOrderController {
     // ==================== 🔥 FIFO 库存推荐 ====================
 
     @GetMapping("/stock-recommend")
-    @Operation(summary = "FIFO 库存推荐（按库位创建时间，先进先出）")
-    public Result<List<Stock>> recommendStock(
+    @Operation(summary = "FIFO 库存推荐（每库位取货量，先进先出）")
+    public Result<List<com.stockmaster.wms.dto.StockRecommendVO>> recommendStock(
             @Parameter(description = "物料ID") @RequestParam Long goodsId,
             @Parameter(description = "需求数量") @RequestParam BigDecimal qty) {
-        List<Stock> stocks = stockService.recommendStock(goodsId, qty);
+        List<com.stockmaster.wms.dto.StockRecommendVO> vos = stockService.recommendStockDetail(goodsId, qty);
         // 填关联名
-        if (!stocks.isEmpty()) {
+        if (!vos.isEmpty()) {
+            List<Long> kwIds = vos.stream().map(v -> v.getKwId()).distinct().collect(Collectors.toList());
+            List<Long> whIds = vos.stream().map(v -> v.getWarehouseId()).distinct().collect(Collectors.toList());
+            Map<Long, String> km = kwService.listByIds(kwIds).stream()
+                    .collect(Collectors.toMap(Kw::getId, Kw::getKwName));
+            Map<Long, String> wm = warehouseService.listByIds(whIds).stream()
+                    .collect(Collectors.toMap(Warehouse::getId, Warehouse::getWarehouseName));
             Map<Long, String> gm = goodsService.listByIds(
-                    stocks.stream().map(Stock::getGoodsId).distinct().collect(Collectors.toList()))
+                    vos.stream().map(v -> v.getGoodsId()).distinct().collect(Collectors.toList()))
                     .stream().collect(Collectors.toMap(Goods::getId, Goods::getGoodsName));
-            Map<Long, String> km = new java.util.HashMap<>();
-            Map<Long, String> wm = new java.util.HashMap<>();
-            stocks.forEach(s -> {
-                s.setGoodsName(gm.get(s.getGoodsId()));
-                s.setKwName(km.computeIfAbsent(s.getKwId(),
-                    kid -> { Kw k = new Kw(); k.setKwName("库位"+kid); return k.getKwName(); }));
+            vos.forEach(v -> {
+                v.setGoodsName(gm.get(v.getGoodsId()));
+                v.setKwName(km.get(v.getKwId()));
+                v.setWarehouseName(wm.get(v.getWarehouseId()));
             });
         }
-        BigDecimal total = stocks.stream().map(Stock::getQty).reduce(BigDecimal.ZERO, BigDecimal::add);
-        return Result.ok("推荐库存总量: " + total, stocks);
+        return Result.ok(vos);
     }
 
     // ==================== 查询 ====================
