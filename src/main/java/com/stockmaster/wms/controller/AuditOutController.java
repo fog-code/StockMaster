@@ -55,6 +55,17 @@ public class AuditOutController {
         return Result.ok(page);
     }
 
+    @PostMapping("/{id}/pickdown")
+    @Operation(summary = "🔥 执行下架（FOR UPDATE 扣库存 + 缺货处理）")
+    public Result<String> pickdown(@PathVariable Long id) {
+        try {
+            auditOutService.pickdown(id);
+            return Result.ok("下架完成", null);
+        } catch (RuntimeException e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
     private void fillNames(List<AuditOut> audits) {
         if (audits.isEmpty()) return;
         Map<Long, String> gm = goodsService.listByIds(
