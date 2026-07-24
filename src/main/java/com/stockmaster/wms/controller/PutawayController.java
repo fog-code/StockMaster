@@ -47,18 +47,24 @@ public class PutawayController {
     }
 
     /**
-     * 库存查询
+     * 库存查询（多维度筛选）
      */
     @GetMapping("/stock/page")
-    @Operation(summary = "库存分页查询")
+    @Operation(summary = "库存分页查询（多维度筛选）")
     public Result<IPage<Stock>> stockPage(
             @Parameter(description = "页码") @RequestParam(defaultValue = "1") Integer current,
             @Parameter(description = "每页条数") @RequestParam(defaultValue = "10") Integer size,
-            @Parameter(description = "物料名称") @RequestParam(required = false) String goodsName,
-            @Parameter(description = "仓库ID") @RequestParam(required = false) Long warehouseId) {
+            @Parameter(description = "物料ID") @RequestParam(required = false) Long goodsId,
+            @Parameter(description = "库位ID") @RequestParam(required = false) Long kwId,
+            @Parameter(description = "库区ID") @RequestParam(required = false) Long areaId,
+            @Parameter(description = "仓库ID") @RequestParam(required = false) Long warehouseId,
+            @Parameter(description = "是否显示零库存") @RequestParam(defaultValue = "false") Boolean showZero) {
         LambdaQueryWrapper<Stock> w = new LambdaQueryWrapper<>();
+        w.eq(goodsId != null, Stock::getGoodsId, goodsId);
+        w.eq(kwId != null, Stock::getKwId, kwId);
+        w.eq(areaId != null, Stock::getAreaId, areaId);
         w.eq(warehouseId != null, Stock::getWarehouseId, warehouseId);
-        w.gt(Stock::getQty, 0);  // 排除0库存
+        if (!showZero) w.gt(Stock::getQty, 0);
         w.orderByDesc(Stock::getUpdateTime);
 
         IPage<Stock> page = stockService.page(new Page<>(current, size), w);
