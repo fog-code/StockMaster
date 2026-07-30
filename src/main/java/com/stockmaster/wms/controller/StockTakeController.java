@@ -116,6 +116,17 @@ public class StockTakeController {
         return takeService.removeById(id) ? Result.ok("删除成功", null) : Result.error("删除失败");
     }
 
+    @PostMapping("/{id}/adjust")
+    @Operation(summary = "确认调账（用实盘数量更新库存）")
+    public Result<String> adjust(@PathVariable Long id) {
+        try {
+            takeService.adjust(id);
+            return Result.ok("调账成功", null);
+        } catch (RuntimeException e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
     // ==================== 辅助 ====================
 
     private void fillNames(List<StockTake> takes) {

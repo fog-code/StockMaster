@@ -122,4 +122,24 @@ public class StockTakeServiceImpl extends ServiceImpl<StockTakeMapper, StockTake
         w.orderByDesc(StockTake::getDiffQty);  // 差异大的排前面
         return this.page(new Page<>(current, size), w);
     }
+
+    @Override
+    @Transactional
+    public void adjust(Long takeId) {
+        StockTake take = getById(takeId);
+        if (take == null) throw new RuntimeException("盘点单不存在");
+        if (!"已完成".equals(take.getStatus())) throw new RuntimeException("只有已完成状态可调账");
+        if (take.getActualQty() == null) throw new RuntimeException("实盘数量为空");
+
+        // 更新库存为实盘数量
+        Stock stock = stockService.getOne(new LambdaQueryWrapper<Stock>()
+                .eq(Stock::getGoodsId, take.getGoodsId())
+                .eq(Stock::getKwId, take.getKwId()));
+        if (stock != null) {
+            stock.setQty(take.getActualQty());
+            stockService.updateById(stock);
+        }
+        take.setStatus("已调账");
+        this.updateById(take);
+    }
 }

@@ -19,4 +19,6 @@ public interface IStockTakeService extends IService<StockTake> {
     void completeTake(Long id);
     /** 差异明细分页查询（diffQty != 0） */
     IPage<StockTake> pageDiff(Integer current, Integer size, String takeType);
+    /** 确认调账：用实盘数量更新库存 */
+    void adjust(Long takeId);
 }

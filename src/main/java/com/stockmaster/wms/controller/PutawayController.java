@@ -72,6 +72,22 @@ public class PutawayController {
         return Result.ok(page);
     }
 
+    @GetMapping("/stock/export")
+    @Operation(summary = "导出库存为CSV")
+    public String exportStock() {
+        List<Stock> stocks = stockService.list(new LambdaQueryWrapper<Stock>().gt(Stock::getQty, 0));
+        fillStockNames(stocks);
+
+        StringBuilder sb = new StringBuilder("物料名称,库位,仓库,数量\n");
+        for (Stock s : stocks) {
+            sb.append(s.getGoodsName()).append(",")
+              .append(s.getKwName()).append(",")
+              .append(s.getWarehouseName()).append(",")
+              .append(s.getQty()).append("\n");
+        }
+        return sb.toString();
+    }
+
     private void fillStockNames(List<Stock> stocks) {
         if (stocks.isEmpty()) return;
         Map<Long, String> gm = goodsService.listByIds(
