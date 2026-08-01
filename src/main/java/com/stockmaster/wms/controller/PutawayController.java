@@ -38,12 +38,8 @@ public class PutawayController {
             @Parameter(description = "质检记录ID") @RequestParam Long auditId,
             @Parameter(description = "目标库位ID") @RequestParam Long kwId,
             @Parameter(description = "上架数量") @RequestParam BigDecimal qty) {
-        try {
-            stockService.putaway(auditId, kwId, qty);
-            return Result.ok("上架成功", null);
-        } catch (RuntimeException e) {
-            return Result.error(e.getMessage());
-        }
+        stockService.putaway(auditId, kwId, qty);
+        return Result.ok("上架成功", null);
     }
 
     /**

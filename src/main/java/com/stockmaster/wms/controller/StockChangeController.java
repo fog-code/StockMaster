@@ -30,14 +30,10 @@ public class StockChangeController {
     @Operation(summary = "调整库存数量")
     public Result<String> adjust(
             @Parameter(description = "库存记录ID") @RequestParam Long stockId,
-            @Parameter(description = "新数量") @RequestParam BigDecimal newQty,
+            @Parameter(description = "新数量") @RequestParam java.math.BigDecimal newQty,
             @Parameter(description = "备注") @RequestParam(required = false) String remark) {
-        try {
-            changeService.adjustQty(stockId, newQty, remark);
-            return Result.ok("调整成功", null);
-        } catch (RuntimeException e) {
-            return Result.error(e.getMessage());
-        }
+        changeService.adjustQty(stockId, newQty, remark);
+        return Result.ok("调整成功", null);
     }
 
     @GetMapping("/page")

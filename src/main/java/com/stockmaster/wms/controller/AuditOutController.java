@@ -31,12 +31,8 @@ public class AuditOutController {
     @PostMapping("/generate/{headerId}")
     @Operation(summary = "从出库单生成下架记录（含FIFO分配）")
     public Result<String> generate(@PathVariable Long headerId) {
-        try {
-            auditOutService.generateFromOrder(headerId);
-            return Result.ok("下架记录已生成，订单状态已变更为【下架中】", null);
-        } catch (RuntimeException e) {
-            return Result.error(e.getMessage());
-        }
+        auditOutService.generateFromOrder(headerId);
+        return Result.ok("下架记录已生成，订单状态已变更为【下架中】", null);
     }
 
     @GetMapping("/page")
@@ -58,12 +54,8 @@ public class AuditOutController {
     @PostMapping("/{id}/pickdown")
     @Operation(summary = "🔥 执行下架（FOR UPDATE 扣库存 + 缺货处理）")
     public Result<String> pickdown(@PathVariable Long id) {
-        try {
-            auditOutService.pickdown(id);
-            return Result.ok("下架完成", null);
-        } catch (RuntimeException e) {
-            return Result.error(e.getMessage());
-        }
+        auditOutService.pickdown(id);
+        return Result.ok("下架完成", null);
     }
 
     private void fillNames(List<AuditOut> audits) {

@@ -80,12 +80,8 @@ public class AuditInController {
             @Parameter(description = "合格数量") @RequestParam java.math.BigDecimal qualifiedQty,
             @Parameter(description = "不合格数量") @RequestParam java.math.BigDecimal unqualifiedQty,
             @Parameter(description = "备注") @RequestParam(required = false) String remark) {
-        try {
-            auditInService.operate(id, qualifiedQty, unqualifiedQty, remark);
-            return Result.ok("质检完成", null);
-        } catch (RuntimeException e) {
-            return Result.error(e.getMessage());
-        }
+        auditInService.operate(id, qualifiedQty, unqualifiedQty, remark);
+        return Result.ok("质检完成", null);
     }
 
     /**

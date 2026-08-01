@@ -119,12 +119,8 @@ public class StockTakeController {
     @PostMapping("/{id}/adjust")
     @Operation(summary = "确认调账（用实盘数量更新库存）")
     public Result<String> adjust(@PathVariable Long id) {
-        try {
-            takeService.adjust(id);
-            return Result.ok("调账成功", null);
-        } catch (RuntimeException e) {
-            return Result.error(e.getMessage());
-        }
+        takeService.adjust(id);
+        return Result.ok("调账成功", null);
     }
 
     // ==================== 辅助 ====================
